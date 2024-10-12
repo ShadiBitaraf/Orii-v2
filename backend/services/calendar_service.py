@@ -1,11 +1,11 @@
 # backend/services/calendar_service.py
 
-import datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import time
 import sys
 import os
 
-# Add the project root directory to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
 from google.oauth2.credentials import Credentials
@@ -16,21 +16,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class CalendarService:
     def __init__(self, credentials: Credentials):
         self.credentials = credentials
         self.service = build("calendar", "v3", credentials=self.credentials)
 
-    def fetch_events(
-        self, calendar_id="primary", min_time=None, max_time=None, max_results=100
-    ):
-        if min_time is None:
-            min_time = datetime.datetime.utcnow().isoformat() + "Z"
-        if max_time is None:
-            max_time = (
-                datetime.datetime.utcnow() + datetime.timedelta(days=30)
-            ).isoformat() + "Z"
+    def format_date(self, date_string):
+        date_obj = datetime.fromisoformat(date_string.rstrip("Z"))
+        return date_obj.strftime("%B %d, %Y at %I:%M %p")
 
+    def fetch_events(self, calendar_id="primary", max_results=1000):
         events = []
         page_token = None
         retry_count = 0
@@ -41,8 +37,6 @@ class CalendarService:
                     self.service.events()
                     .list(
                         calendarId=calendar_id,
-                        timeMin=min_time,
-                        timeMax=max_time,
                         maxResults=max_results,
                         singleEvents=True,
                         orderBy="startTime",
@@ -59,6 +53,20 @@ class CalendarService:
                         if "dateTime" in event["start"]
                         else "All Day Event"
                     )
+                    if "dateTime" in event["start"]:
+                        event["start"]["formatted"] = self.format_date(
+                            event["start"]["dateTime"]
+                        )
+                        event["end"]["formatted"] = self.format_date(
+                            event["end"]["dateTime"]
+                        )
+                    else:
+                        event["start"]["formatted"] = self.format_date(
+                            event["start"]["date"] + "T00:00:00"
+                        )
+                        event["end"]["formatted"] = self.format_date(
+                            event["end"]["date"] + "T00:00:00"
+                        )
                     events.append(event)
 
                 page_token = events_result.get("nextPageToken")
@@ -71,11 +79,13 @@ class CalendarService:
                     time.sleep(2**retry_count)  # Exponential backoff
                     continue
                 else:
-                    print(f"An error occurred: {error}")
+                    print(f"An error occurred while fetching events: {error}")
                     break
 
         validated_events = [Event(**event) for event in events]
-        return EventList(events=validated_events)
+        now = datetime.now(ZoneInfo("UTC"))
+        current_date_context = f"Today is {now.strftime('%B %d, %Y')}. "
+        return current_date_context, EventList(events=validated_events)
 
     def search_events(self, query, max_results=10):
         try:
@@ -95,7 +105,7 @@ class CalendarService:
             validated_events = [Event(**event) for event in items]
             return EventList(events=validated_events)
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            print(f"An error occurred while searching events: {error}")
             return EventList(events=[])
 
     def get_event_details(self, event_id):
@@ -107,5 +117,5 @@ class CalendarService:
             )
             return Event(**event)
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            print(f"An error occurred while getting event details: {error}")
             return None
