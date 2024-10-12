@@ -10,6 +10,16 @@ esdenv/
 
 # Ignore all JSON data files
 data/**/*.json
+token.json
+backend/cli/client_secret.json
+**/client_secret.json
+backend/cli/*.json
+backend/auth
+**/auth/
+backend/auth/oauth_server.py
+
+
+
 
 # Ignore configuration files with credentials
 config/

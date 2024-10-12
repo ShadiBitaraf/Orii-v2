@@ -1,0 +1,28 @@
+{
+  "manifest_version": 2,
+  "name": "ORII - Calendar Assistant",
+  "version": "1.0",
+  "description": "Interact with your Google Calendar using natural language",
+  "permissions": [
+    "identity",
+    "https://www.googleapis.com/auth/calendar.readonly"
+  ],
+  "oauth2": {
+    "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.readonly"
+    ]
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
+}

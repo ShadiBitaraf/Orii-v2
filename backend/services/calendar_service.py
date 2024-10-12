@@ -6,7 +6,7 @@ import sys
 import os
 
 # Add the project root directory to Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
