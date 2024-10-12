@@ -7,11 +7,12 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from datetime import datetime, timedelta
 
 # Add the project root directory to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
-
+from backend.services.calendar_service import CalendarService
 from backend.services.nlp_service import NLPService
 from dotenv import load_dotenv
 
@@ -73,18 +74,17 @@ def fetch_events(service, max_results=10):
         return []
 
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
 def main():
     credentials = get_credentials()
     if not credentials:
         print("Failed to obtain valid credentials. Exiting.")
         return
 
-    try:
-        service = build("calendar", "v3", credentials=credentials)
-    except Exception as e:
-        print(f"Error building calendar service: {e}")
-        return
-
+    calendar_service = CalendarService(credentials)
     nlp_service = NLPService()
 
     print("Welcome to the Calendar Q&A CLI!")
@@ -99,18 +99,26 @@ def main():
 
         try:
             # Fetch recent events
-            events = fetch_events(service)
+            current_date_context, events = calendar_service.fetch_events(max_results=10)
 
             # Prepare context from events
-            context = " ".join(
+            events_context = " ".join(
                 [
-                    f"{event['summary']} on {event['start'].get('dateTime', event['start'].get('date'))}"
-                    for event in events
+                    f"{event.summary} on {event.start.get('formatted', event.start.get('dateTime', event.start.get('date')))}"
+                    for event in events.events
                 ]
             )
 
-            # Generate response
-            response = nlp_service.generate_response(query, context)
+            # Combine current date context and events context
+            full_context = current_date_context + events_context
+
+            # Handle "what day is it today" query specifically
+            if "what day is it today" in query.lower():
+                today = datetime.now(ZoneInfo("UTC"))
+                response = f"Today is {today.strftime('%A, %B %d, %Y')}."
+            else:
+                # Generate response using NLP service
+                response = nlp_service.generate_response(query, full_context)
 
             print(f"\nAnswer: {response}")
         except Exception as e:
