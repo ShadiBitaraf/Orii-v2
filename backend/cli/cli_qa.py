@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 # Add the project root directory to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
-from backend.services.calendar_service import CalendarService
+from backend.services.calendar_service import CalendarServicefrom backend.services.calendar_service import CalendarService
 from backend.services.nlp_service import NLPService
 from dotenv import load_dotenv
 
@@ -85,9 +85,10 @@ def main():
         return
 
     calendar_service = CalendarService(credentials)
+    calendar_service = CalendarService(credentials)
     nlp_service = NLPService()
 
-    print("Welcome to the Calendar Q&A CLI!")
+    print("\n\nWelcome to the Calendar Q&A CLI!")
     print("Type 'exit' to quit the application.")
 
     while True:
@@ -101,13 +102,16 @@ def main():
             # Fetch recent events
             current_date_context, events = calendar_service.fetch_events(max_results=10)
 
-            # Prepare context from events
-            events_context = " ".join(
+            # Prepare context from events using formatted dates
+            events_events_context = " ".join(
                 [
                     f"{event.summary} on {event.start.get('formatted', event.start.get('dateTime', event.start.get('date')))}"
                     for event in events.events
                 ]
             )
+
+            # Combine current date context and events context
+            full_context = current_date_context + events_context
 
             # Combine current date context and events context
             full_context = current_date_context + events_context
@@ -120,7 +124,14 @@ def main():
                 # Generate response using NLP service
                 response = nlp_service.generate_response(query, full_context)
 
-            print(f"\nAnswer: {response}")
+            # Check if the response indicates no matching events
+            if "no events" in response.lower() or "couldn't find" in response.lower():
+                print(
+                    "\nI couldn't find any events matching your query. Could you please provide more details or try a different question?"
+                )
+            else:
+                print(f"\nAnswer: {response}")
+
         except Exception as e:
             print(f"An error occurred: {str(e)}")
             print("Please try again or type 'exit' to quit.")
