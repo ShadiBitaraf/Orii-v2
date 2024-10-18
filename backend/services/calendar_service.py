@@ -1,13 +1,9 @@
 # backend/services/calendar_service.py
-
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import time
 import sys
 import os
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, project_root)
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -23,10 +19,20 @@ class CalendarService:
         self.service = build("calendar", "v3", credentials=self.credentials)
 
     def format_date(self, date_string):
-        date_obj = datetime.fromisoformat(date_string.rstrip("Z"))
-        return date_obj.strftime("%B %d, %Y at %I:%M %p")
+        # Convert the ISO format date string to a timezone-aware datetime object
+        date_obj = datetime.fromisoformat(date_string.rstrip("Z")).replace(
+            tzinfo=ZoneInfo("UTC")
+        )
+        return date_obj.strftime("%B %d, %Y at %I:%M %p %Z")
 
-    def fetch_events(self, calendar_id="primary", max_results=1000):
+    def fetch_events(self, calendar_id="primary", max_results=100):
+        # Get the current date and time in UTC
+        now = datetime.now(ZoneInfo("UTC"))
+
+        # Set time range: 7 days before and 30 days after current date
+        time_min = (now - timedelta(days=7)).isoformat()
+        time_max = (now + timedelta(days=30)).isoformat()
+
         events = []
         page_token = None
         retry_count = 0
@@ -37,6 +43,8 @@ class CalendarService:
                     self.service.events()
                     .list(
                         calendarId=calendar_id,
+                        timeMin=time_min,
+                        timeMax=time_max,
                         maxResults=max_results,
                         singleEvents=True,
                         orderBy="startTime",
@@ -53,6 +61,7 @@ class CalendarService:
                         if "dateTime" in event["start"]
                         else "All Day Event"
                     )
+                    # Format the start and end times
                     if "dateTime" in event["start"]:
                         event["start"]["formatted"] = self.format_date(
                             event["start"]["dateTime"]
@@ -62,10 +71,10 @@ class CalendarService:
                         )
                     else:
                         event["start"]["formatted"] = self.format_date(
-                            event["start"]["date"] + "T00:00:00"
+                            event["start"]["date"] + "T00:00:00Z"
                         )
                         event["end"]["formatted"] = self.format_date(
-                            event["end"]["date"] + "T00:00:00"
+                            event["end"]["date"] + "T00:00:00Z"
                         )
                     events.append(event)
 
@@ -79,11 +88,10 @@ class CalendarService:
                     time.sleep(2**retry_count)  # Exponential backoff
                     continue
                 else:
-                    print(f"An error occurred while fetching events: {error}")
+                    print(f"An error occurred: {error}")
                     break
 
         validated_events = [Event(**event) for event in events]
-        now = datetime.now(ZoneInfo("UTC"))
         current_date_context = f"Today is {now.strftime('%B %d, %Y')}. "
         return current_date_context, EventList(events=validated_events)
 
